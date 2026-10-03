@@ -1,14 +1,25 @@
 # tmux-agent-bridge
 
-Small tmux bridge for sending messages to coding agents that run in tmux panes.
+A small bridge that lets independent terminal agents — Codex, Claude, Cursor Agent, or any other agent running in its own tmux pane — coordinate with each other as peers: review each other's work, split tasks, and converge on an answer, without a human relaying every message by hand.
 
-It is useful when you run several agents at the same time, such as Codex, Claude, Cursor Agent, or another terminal agent. It avoids the common mistake where text is pasted into a pane but not submitted.
+## Why not just use native subagents?
+
+If you are spawning a helper inside one agent product, use that product's native subagent or task tool. It is simpler. The parent owns the context, lifecycle, and permissions.
+
+`tmux-agent-bridge` is for a different shape of work: two separate agent sessions already running in tmux.
+
+For example, Claude Code and Codex may each be hours deep in their own context. Each may have different tools, files, permissions, or judgment. Neither is the parent. Neither can call the other through a shared API.
+
+This bridge gives those independent sessions a small, reliable way to talk, review each other's work, split tasks, and converge.
+
+If your agents are not independent peers, you probably do not need this.
 
 ## What it does
 
 - Lists available tmux panes.
 - Sends a message to a target pane.
 - Optionally adds a routing prefix, such as `FOR CLAUDE:`.
+- Supports agent-to-agent review, task splitting, and convergence loops through the installed skill guidance.
 - Clears the current input line before paste by default, so messages do not append to half-typed text.
 - Presses Enter after pasting the message.
 - Waits briefly before Enter, then retries Enter once if the message or a paste placeholder still appears near the pane input area.
