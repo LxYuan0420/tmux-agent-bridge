@@ -44,7 +44,7 @@ Keep the conversation going until one of these terminal states is reached:
 Loop shape:
 
 1. Send a compact request with the goal, scope, evidence needed, and expected verdict.
-2. Wait and capture the target pane output.
+2. Wait and capture the target pane output. Waiting can mean checking back periodically or after doing other useful work. Do not block synchronously on long-running agent work.
 3. Read the actual response, not only the helper receipt.
 4. If the other agent flags a concrete issue, fix it or respond with evidence.
 5. Send the update back for re-review.
