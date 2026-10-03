@@ -17,6 +17,12 @@ Do not type raw `tmux send-keys` sequences manually for agent messages. Use the 
 tmux-agent-send --target TARGET --prefix PREFIX "message"
 ```
 
+## Standing connection
+
+Once this skill is invoked in a tmux session, treat the coding-agent panes in that same active tmux session as connected for the rest of the current user-approved work scope. The user should not need to re-invoke the skill or ask for each relay.
+
+Proactively send another agent anything useful for it to know or act on: a finding, fix, blocker, decision, or shared-state change. Use judgment on what crosses the bar. This is permission to stop waiting to be told, not permission to narrate every step.
+
 ## How to use
 
 1. If the target pane is unknown, list panes:

@@ -19,6 +19,7 @@ If your agents are not independent peers, you probably do not need this.
 - Lists available tmux panes.
 - Sends a message to a target pane.
 - Optionally adds a routing prefix, such as `FOR CLAUDE:`.
+- Treats agent panes in the same active tmux session as standing-connected for the current user-approved work scope.
 - Supports agent-to-agent review, task splitting, and convergence loops through the installed skill guidance.
 - Clears the current input line before paste by default, so messages do not append to half-typed text.
 - Presses Enter after pasting the message.
