@@ -11,7 +11,7 @@ The target can be Codex, Claude, Cursor Agent, or any other terminal-based agent
 
 ## Rule
 
-Do not type raw `tmux send-keys` sequences manually for agent messages. Use the helper so the message is submitted with Enter and a short receipt check can be shown. The helper waits briefly before Enter and retries Enter once if the message or a paste placeholder still appears near the pane input area. This avoids the common failure where text is pasted into the pane but not submitted.
+Do not type raw `tmux send-keys` sequences manually for agent messages. Use the helper so the message is submitted with Enter and a short receipt check can be shown. The helper clears the current input line before paste by default, waits briefly before Enter, and retries Enter once if the message or a paste placeholder still appears near the pane input area. This avoids common failures where text appends to old input or is pasted but not submitted.
 
 ```bash
 tmux-agent-send --target TARGET --prefix PREFIX "message"
@@ -47,11 +47,24 @@ For day-to-day handoffs, keep the best low-cost parts only:
 
 - stable target pane,
 - optional prefix,
+- prompt-line clearing before paste,
 - safe paste through a tmux buffer,
 - separate Enter submit,
 - small paste-to-submit delay,
 - one guarded Enter retry when the message or a paste placeholder still appears near the input area,
 - short receipt capture.
+
+## Splitting work
+
+When a task is large enough to involve another agent, do not only hand it off. First look for a useful split that improves speed, quality, or verification.
+
+- Decompose first: identify which parts are genuinely independent and which parts must happen in order. Split only the independent parts.
+- Assign by strength: give each agent work that fits its current context, access, or ability to verify. Do not split by line count.
+- Make boundaries explicit: state what this agent owns, what the other agent owns, and what neither should touch yet.
+- State the handback contract: define what done means, what evidence is expected back, and whether the sender is blocked or can continue in parallel.
+- Cross-check results: when work is split, have the agent that did not perform the work spot-check or re-review before the combined result is called done.
+- Check capacity first: do not pile a new task onto an agent that is still deep in another task unless it is clearly safe to queue.
+- Keep dispatch human-directed: the script must not become an automatic dispatcher, queue, or scheduler. Splitting is a judgment call made before using `tmux-agent-send`.
 
 ## Safety
 

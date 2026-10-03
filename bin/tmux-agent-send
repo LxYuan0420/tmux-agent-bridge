@@ -4,8 +4,8 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  tmux-agent-send -t TARGET [-p PREFIX] [-n LINES] "message"
-  printf '%s\n' "message" | tmux-agent-send -t TARGET [-p PREFIX]
+  tmux-agent-send -t TARGET [-p PREFIX] [-n LINES] [--no-clear-input] "message"
+  printf '%s\n' "message" | tmux-agent-send -t TARGET [-p PREFIX] [--no-clear-input]
   tmux-agent-send --list
 
 Options:
@@ -16,9 +16,11 @@ Options:
   -n, --lines LINES     Lines of target pane output to show after send.
                        Default: AGENT_TMUX_CAPTURE_LINES or 20. Use 0 to skip.
   -q, --quiet           Do not show recent pane output.
+  --no-clear-input      Do not send Ctrl-U before pasting.
   --list                List panes in the current tmux server.
 
 Environment:
+  AGENT_TMUX_CLEAR_INPUT    Send Ctrl-U before paste. Default: 1.
   AGENT_TMUX_SUBMIT_DELAY   Delay between paste and Enter. Default: 0.2.
   AGENT_TMUX_RECEIPT_DELAY  Delay before receipt capture. Default: 0.2.
   AGENT_TMUX_RETRY_LINES    Bottom pane lines checked for unsent input. Default: 5.
@@ -33,6 +35,7 @@ target="${AGENT_TMUX_TARGET:-}"
 prefix=""
 lines="${AGENT_TMUX_CAPTURE_LINES:-20}"
 quiet=0
+clear_input="${AGENT_TMUX_CLEAR_INPUT:-1}"
 submit_delay="${AGENT_TMUX_SUBMIT_DELAY:-0.2}"
 receipt_delay="${AGENT_TMUX_RECEIPT_DELAY:-0.2}"
 retry_lines="${AGENT_TMUX_RETRY_LINES:-5}"
@@ -61,6 +64,10 @@ while [[ "$#" -gt 0 ]]; do
       ;;
     -q|--quiet)
       quiet=1
+      shift
+      ;;
+    --no-clear-input)
+      clear_input=0
       shift
       ;;
     --)
@@ -94,6 +101,15 @@ esac
 case "${retry_lines}" in
   ''|*[!0-9]*)
     printf 'error: retry line count must be a non-negative integer: %s\n' "${retry_lines}" >&2
+    exit 2
+    ;;
+esac
+
+case "${clear_input}" in
+  0|1)
+    ;;
+  *)
+    printf 'error: AGENT_TMUX_CLEAR_INPUT must be 0 or 1: %s\n' "${clear_input}" >&2
     exit 2
     ;;
 esac
@@ -157,6 +173,10 @@ fi
 
 probe="$(message_probe)"
 buffer_name="agent-send-${$}-${RANDOM}"
+if [[ "${clear_input}" == "1" ]]; then
+  tmux send-keys -t "${target}" C-u
+  sleep 0.05
+fi
 printf '%s' "${payload}" | tmux load-buffer -b "${buffer_name}" -
 tmux paste-buffer -b "${buffer_name}" -t "${target}" -p
 tmux delete-buffer -b "${buffer_name}" >/dev/null 2>&1 || true
