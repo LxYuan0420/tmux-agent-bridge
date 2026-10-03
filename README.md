@@ -10,7 +10,7 @@ It is useful when you run several agents at the same time, such as Codex, Claude
 - Sends a message to a target pane.
 - Optionally adds a routing prefix, such as `FOR CLAUDE:`.
 - Presses Enter after pasting the message.
-- Waits briefly before Enter, then retries Enter once if the pane output did not move.
+- Waits briefly before Enter, then retries Enter once if the message still appears near the pane input area.
 - Shows a short receipt from the target pane.
 
 ## What it does not do
@@ -71,6 +71,7 @@ export AGENT_TMUX_TARGET=%64
 export AGENT_TMUX_CAPTURE_LINES=20
 export AGENT_TMUX_SUBMIT_DELAY=0.2
 export AGENT_TMUX_RECEIPT_DELAY=0.2
+export AGENT_TMUX_RETRY_LINES=5
 tmux-agent-send --prefix "FOR CLAUDE:" "Please continue the review."
 ```
 
@@ -82,7 +83,7 @@ The best existing tools for multi-agent tmux work tend to include session manage
 - safe paste through a tmux buffer,
 - explicit Enter submit,
 - small paste-to-submit delay,
-- one guarded Enter retry when pane output does not advance,
+- one guarded Enter retry when the message still appears near the input area,
 - short receipt capture,
 - quiet mode for token control.
 

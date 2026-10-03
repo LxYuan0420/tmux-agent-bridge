@@ -21,6 +21,7 @@ Options:
 Environment:
   AGENT_TMUX_SUBMIT_DELAY   Delay between paste and Enter. Default: 0.2.
   AGENT_TMUX_RECEIPT_DELAY  Delay before receipt capture. Default: 0.2.
+  AGENT_TMUX_RETRY_LINES    Bottom pane lines checked for unsent input. Default: 5.
 
 Purpose:
   Send a message to any tmux-hosted agent, press Enter in the same command, and
@@ -34,6 +35,7 @@ lines="${AGENT_TMUX_CAPTURE_LINES:-20}"
 quiet=0
 submit_delay="${AGENT_TMUX_SUBMIT_DELAY:-0.2}"
 receipt_delay="${AGENT_TMUX_RECEIPT_DELAY:-0.2}"
+retry_lines="${AGENT_TMUX_RETRY_LINES:-5}"
 
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
@@ -89,6 +91,13 @@ case "${lines}" in
     ;;
 esac
 
+case "${retry_lines}" in
+  ''|*[!0-9]*)
+    printf 'error: retry line count must be a non-negative integer: %s\n' "${retry_lines}" >&2
+    exit 2
+    ;;
+esac
+
 if [[ "$#" -gt 0 ]]; then
   message="$*"
 else
@@ -111,25 +120,40 @@ capture_recent() {
   tmux capture-pane -t "${target}" -p -S -100 | sed '/^[[:space:]]*$/d' | tail -n "${line_count}"
 }
 
+capture_bottom() {
+  local line_count="${1:-5}"
+  tmux capture-pane -t "${target}" -p | tail -n "${line_count}"
+}
+
+message_probe() {
+  local candidate=""
+  while IFS= read -r line; do
+    if [[ -n "${line//[[:space:]]/}" ]]; then
+      candidate="${line}"
+    fi
+  done <<< "${payload}"
+  printf '%s' "${candidate:0:120}"
+}
+
 payload="${message}"
 if [[ -n "${prefix}" && "${payload}" != "${prefix}"* ]]; then
   payload="${prefix} ${payload}"
 fi
 
+probe="$(message_probe)"
 buffer_name="agent-send-${$}-${RANDOM}"
 printf '%s' "${payload}" | tmux load-buffer -b "${buffer_name}" -
 tmux paste-buffer -b "${buffer_name}" -t "${target}" -p
 tmux delete-buffer -b "${buffer_name}" >/dev/null 2>&1 || true
-pre_submit_capture="$(capture_recent 20)"
 sleep "${submit_delay}"
 tmux send-keys -t "${target}" Enter
 sleep "${receipt_delay}"
-post_submit_capture="$(capture_recent 20)"
+post_submit_bottom="$(capture_bottom "${retry_lines}")"
 
-if [[ "${post_submit_capture}" == "${pre_submit_capture}" ]]; then
+if [[ "${retry_lines}" != "0" && -n "${probe}" ]] && grep -Fq -- "${probe}" <<< "${post_submit_bottom}"; then
   tmux send-keys -t "${target}" Enter
   sleep "${receipt_delay}"
-  printf 'submitted: %s (retried Enter once because pane output did not advance)\n' "${target}"
+  printf 'submitted: %s (retried Enter once because message still appeared near pane input)\n' "${target}"
 else
   printf 'submitted: %s\n' "${target}"
 fi
