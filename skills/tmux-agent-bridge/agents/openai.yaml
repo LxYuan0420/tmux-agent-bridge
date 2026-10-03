@@ -1,0 +1,3 @@
+interface:
+  display_name: "Tmux Agent Bridge"
+  short_description: "Send messages to tmux-hosted agents reliably"

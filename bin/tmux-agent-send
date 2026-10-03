@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  tmux-agent-send -t TARGET [-p PREFIX] [-n LINES] "message"
+  printf '%s\n' "message" | tmux-agent-send -t TARGET [-p PREFIX]
+  tmux-agent-send --list
+
+Options:
+  -t, --target TARGET   tmux target pane, for example %64 or work:0.2.
+                       Defaults to AGENT_TMUX_TARGET if set.
+  -p, --prefix PREFIX   Prefix added when the message does not already start
+                       with it. Example: "FOR CLAUDE:"
+  -n, --lines LINES     Lines of target pane output to show after send.
+                       Default: AGENT_TMUX_CAPTURE_LINES or 20. Use 0 to skip.
+  -q, --quiet           Do not show recent pane output.
+  --list                List panes in the current tmux server.
+
+Purpose:
+  Send a message to any tmux-hosted agent, press Enter in the same command, and
+  optionally show a short receipt check. Use this instead of raw tmux send-keys.
+EOF
+}
+
+target="${AGENT_TMUX_TARGET:-}"
+prefix=""
+lines="${AGENT_TMUX_CAPTURE_LINES:-20}"
+quiet=0
+
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --list)
+      tmux list-panes -a -F '#{session_name}:#{window_index}.#{pane_index} #{pane_id} #{pane_title} #{pane_current_path}'
+      exit 0
+      ;;
+    -t|--target)
+      target="${2:?missing target}"
+      shift 2
+      ;;
+    -p|--prefix)
+      prefix="${2:?missing prefix}"
+      shift 2
+      ;;
+    -n|--lines)
+      lines="${2:?missing line count}"
+      shift 2
+      ;;
+    -q|--quiet)
+      quiet=1
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      printf 'error: unknown option: %s\n' "$1" >&2
+      usage >&2
+      exit 2
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+if [[ -z "${target}" ]]; then
+  printf 'error: target pane is required. Use -t TARGET or AGENT_TMUX_TARGET.\n' >&2
+  printf 'hint: run: tmux-agent-send --list\n' >&2
+  exit 2
+fi
+
+case "${lines}" in
+  ''|*[!0-9]*)
+    printf 'error: line count must be a non-negative integer: %s\n' "${lines}" >&2
+    exit 2
+    ;;
+esac
+
+if [[ "$#" -gt 0 ]]; then
+  message="$*"
+else
+  message="$(cat)"
+fi
+
+if [[ -z "${message//[[:space:]]/}" ]]; then
+  printf 'error: message is empty\n' >&2
+  exit 2
+fi
+
+if ! tmux display-message -p -t "${target}" '#{pane_id}' >/dev/null 2>&1; then
+  printf 'error: tmux pane not found: %s\n' "${target}" >&2
+  printf 'hint: run: tmux-agent-send --list\n' >&2
+  exit 1
+fi
+
+payload="${message}"
+if [[ -n "${prefix}" && "${payload}" != "${prefix}"* ]]; then
+  payload="${prefix} ${payload}"
+fi
+
+buffer_name="agent-send-${$}-${RANDOM}"
+printf '%s' "${payload}" | tmux load-buffer -b "${buffer_name}" -
+tmux paste-buffer -b "${buffer_name}" -t "${target}" -p
+tmux delete-buffer -b "${buffer_name}" >/dev/null 2>&1 || true
+tmux send-keys -t "${target}" Enter
+
+printf 'sent: %s\n' "${target}"
+
+if [[ "${quiet}" -eq 0 && "${lines}" != "0" ]]; then
+  printf '%s\n' '--- recent target pane output ---'
+  tmux capture-pane -t "${target}" -p | tail -n "${lines}"
+fi
