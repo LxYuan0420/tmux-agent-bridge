@@ -125,6 +125,10 @@ capture_bottom() {
   tmux capture-pane -t "${target}" -p | tail -n "${line_count}"
 }
 
+contains_paste_placeholder() {
+  grep -Eiq '\[[[:space:]]*pasted[[:space:]]+(content|text)[^]]*[0-9][^]]*(chars?|lines?)[^]]*\]'
+}
+
 message_probe() {
   local candidate=""
   while IFS= read -r line; do
@@ -133,6 +137,17 @@ message_probe() {
     fi
   done <<< "${payload}"
   printf '%s' "${candidate:0:120}"
+}
+
+looks_unsent() {
+  local bottom_capture="${1}"
+  if [[ -n "${probe}" ]] && grep -Fq -- "${probe}" <<< "${bottom_capture}"; then
+    return 0
+  fi
+  if contains_paste_placeholder <<< "${bottom_capture}"; then
+    return 0
+  fi
+  return 1
 }
 
 payload="${message}"
@@ -150,10 +165,10 @@ tmux send-keys -t "${target}" Enter
 sleep "${receipt_delay}"
 post_submit_bottom="$(capture_bottom "${retry_lines}")"
 
-if [[ "${retry_lines}" != "0" && -n "${probe}" ]] && grep -Fq -- "${probe}" <<< "${post_submit_bottom}"; then
+if [[ "${retry_lines}" != "0" ]] && looks_unsent "${post_submit_bottom}"; then
   tmux send-keys -t "${target}" Enter
   sleep "${receipt_delay}"
-  printf 'submitted: %s (retried Enter once because message still appeared near pane input)\n' "${target}"
+  printf 'submitted: %s (retried Enter once because message or paste placeholder still appeared near pane input)\n' "${target}"
 else
   printf 'submitted: %s\n' "${target}"
 fi
