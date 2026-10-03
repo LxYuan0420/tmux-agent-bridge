@@ -18,6 +18,10 @@ Options:
   -q, --quiet           Do not show recent pane output.
   --list                List panes in the current tmux server.
 
+Environment:
+  AGENT_TMUX_SUBMIT_DELAY   Delay between paste and Enter. Default: 0.2.
+  AGENT_TMUX_RECEIPT_DELAY  Delay before receipt capture. Default: 0.2.
+
 Purpose:
   Send a message to any tmux-hosted agent, press Enter in the same command, and
   optionally show a short receipt check. Use this instead of raw tmux send-keys.
@@ -28,6 +32,8 @@ target="${AGENT_TMUX_TARGET:-}"
 prefix=""
 lines="${AGENT_TMUX_CAPTURE_LINES:-20}"
 quiet=0
+submit_delay="${AGENT_TMUX_SUBMIT_DELAY:-0.2}"
+receipt_delay="${AGENT_TMUX_RECEIPT_DELAY:-0.2}"
 
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
@@ -100,6 +106,11 @@ if ! tmux display-message -p -t "${target}" '#{pane_id}' >/dev/null 2>&1; then
   exit 1
 fi
 
+capture_recent() {
+  local line_count="${1:-20}"
+  tmux capture-pane -t "${target}" -p -S -100 | sed '/^[[:space:]]*$/d' | tail -n "${line_count}"
+}
+
 payload="${message}"
 if [[ -n "${prefix}" && "${payload}" != "${prefix}"* ]]; then
   payload="${prefix} ${payload}"
@@ -109,11 +120,21 @@ buffer_name="agent-send-${$}-${RANDOM}"
 printf '%s' "${payload}" | tmux load-buffer -b "${buffer_name}" -
 tmux paste-buffer -b "${buffer_name}" -t "${target}" -p
 tmux delete-buffer -b "${buffer_name}" >/dev/null 2>&1 || true
+pre_submit_capture="$(capture_recent 20)"
+sleep "${submit_delay}"
 tmux send-keys -t "${target}" Enter
+sleep "${receipt_delay}"
+post_submit_capture="$(capture_recent 20)"
 
-printf 'sent: %s\n' "${target}"
+if [[ "${post_submit_capture}" == "${pre_submit_capture}" ]]; then
+  tmux send-keys -t "${target}" Enter
+  sleep "${receipt_delay}"
+  printf 'submitted: %s (retried Enter once because pane output did not advance)\n' "${target}"
+else
+  printf 'submitted: %s\n' "${target}"
+fi
 
 if [[ "${quiet}" -eq 0 && "${lines}" != "0" ]]; then
   printf '%s\n' '--- recent target pane output ---'
-  tmux capture-pane -t "${target}" -p | tail -n "${lines}"
+  capture_recent "${lines}"
 fi

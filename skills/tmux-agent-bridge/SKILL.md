@@ -11,7 +11,7 @@ The target can be Codex, Claude, Cursor Agent, or any other terminal-based agent
 
 ## Rule
 
-Do not type raw `tmux send-keys` sequences manually for agent messages. Use the helper so the message is submitted with Enter and a short receipt check can be shown. This avoids the common failure where text is pasted into the pane but not submitted.
+Do not type raw `tmux send-keys` sequences manually for agent messages. Use the helper so the message is submitted with Enter and a short receipt check can be shown. The helper waits briefly before Enter and retries Enter once if the pane output does not advance. This avoids the common failure where text is pasted into the pane but not submitted.
 
 ```bash
 tmux-agent-send --target TARGET --prefix PREFIX "message"
@@ -49,6 +49,8 @@ For day-to-day handoffs, keep the best low-cost parts only:
 - optional prefix,
 - safe paste through a tmux buffer,
 - separate Enter submit,
+- small paste-to-submit delay,
+- one guarded Enter retry,
 - short receipt capture.
 
 ## Safety
